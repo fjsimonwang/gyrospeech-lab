@@ -12,6 +12,17 @@ plus an offline training scaffold under [`training/`](training/).
 > own device or in experiments with explicit consent. Capturing other people's
 > speech without consent may be illegal in your jurisdiction.
 
+## Screenshot
+
+<p align="center">
+  <img src="docs/screenshot.jpg" alt="GyroSpeech Lab — live gyroscope capture, FFT spectrum, and on-device classifier" width="340">
+</p>
+
+*Live gyroscope capture on a Motorola Razr+ (2024). With the
+`HIGH_SAMPLING_RATE_SENSORS` permission the sampling rate reaches ~414 Hz
+(Nyquist ~207 Hz) rather than the default Android 200 Hz cap — most of the
+spectral energy still sits below ~100 Hz.*
+
 ## Features
 
 - **M0 — Capture & visualize:** reads the gyroscope or accelerometer at the
@@ -32,9 +43,11 @@ plus an offline training scaffold under [`training/`](training/).
 
 The physics ceiling is set by the sampling rate:
 
-- Android 12+ caps motion sensors at **200 Hz** → only content **< 100 Hz** can
-  be recovered (Nyquist). Speech intelligibility lives mostly at 1–4 kHz, which
-  the sensor physically cannot sample.
+- Android 12+ caps motion sensors at **200 Hz** by default; holding the
+  `HIGH_SAMPLING_RATE_SENSORS` permission (declared by this app) can lift it
+  where the hardware allows — e.g. ~414 Hz measured on a Razr+ (2024). Even so,
+  speech intelligibility lives mostly at 1–4 kHz, far above what these sensors
+  sample, and most captured energy stays below ~100 Hz.
 
 | Task | Sensor | Source | Feasibility |
 |---|---|---|---|
