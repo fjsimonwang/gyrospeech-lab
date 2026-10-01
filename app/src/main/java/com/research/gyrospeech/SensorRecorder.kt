@@ -18,8 +18,8 @@ import kotlin.math.sqrt
 class SensorRecorder(context: Context) : SensorEventListener {
 
     enum class Kind(val type: Int, val label: String) {
-        GYRO(Sensor.TYPE_GYROSCOPE, "陀螺仪 Gyroscope"),
-        ACCEL(Sensor.TYPE_ACCELEROMETER, "加速度计 Accelerometer")
+        GYRO(Sensor.TYPE_GYROSCOPE, "Gyroscope"),
+        ACCEL(Sensor.TYPE_ACCELEROMETER, "Accelerometer")
     }
 
     private val sm = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager

@@ -38,9 +38,9 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         recorder = SensorRecorder(this)
-        genderClf = Classifier(this, "gender").apply { ensureLabel("男 Male"); ensureLabel("女 Female") }
-        speakerClf = Classifier(this, "speaker").apply {
-            ensureLabel("说话人 A"); ensureLabel("说话人 B"); ensureLabel("说话人 C")
+        genderClf = Classifier(this, "gender_en").apply { ensureLabel("Male"); ensureLabel("Female") }
+        speakerClf = Classifier(this, "speaker_en").apply {
+            ensureLabel("Speaker A"); ensureLabel("Speaker B"); ensureLabel("Speaker C")
         }
         setContent { App(recorder, genderClf, speakerClf) }
     }
@@ -56,7 +56,7 @@ private val accent2 = Color(0xFF7C9CFF)
 private val warn = Color(0xFFF2C57C)
 private val textDim = Color(0xFF9AA0B4)
 
-private enum class Mode(val label: String) { GENDER("性别分类"), SPEAKER("说话人分类") }
+private enum class Mode(val label: String) { GENDER("Gender"), SPEAKER("Speaker") }
 
 @Composable
 fun App(recorder: SensorRecorder, genderClf: Classifier, speakerClf: Classifier) {
@@ -126,7 +126,7 @@ fun App(recorder: SensorRecorder, genderClf: Classifier, speakerClf: Classifier)
                         enrolling = null
                         enrollProgress = 0
                         uiTick++
-                        statusMsg = "已录入「$target」，样本 ${clf.sampleCount(target)} 条"
+                        statusMsg = "Enrolled \"$target\" — ${clf.sampleCount(target)} samples"
                     }
                 }
                 prediction = null
@@ -157,8 +157,8 @@ fun App(recorder: SensorRecorder, genderClf: Classifier, speakerClf: Classifier)
 
             MetricRow(hz, count, pitchHz)
 
-            SectionCard("三轴幅度波形 |a| (时域)") { WaveformCanvas(waveState) }
-            SectionCard("幅度谱 FFT — 有效带宽 ≈ 0…${(hz / 2).toInt()} Hz") { SpectrumCanvas(spectrum) }
+            SectionCard("3-axis magnitude |a| (time domain)") { WaveformCanvas(waveState) }
+            SectionCard("FFT magnitude spectrum — usable band ≈ 0…${(hz / 2).toInt()} Hz") { SpectrumCanvas(spectrum) }
 
             // ===== M2 分类 =====
             ClassifierCard(
@@ -172,8 +172,8 @@ fun App(recorder: SensorRecorder, genderClf: Classifier, speakerClf: Classifier)
                 energy = energy,
                 voiceGate = voiceGate,
                 uiTick = uiTick,
-                onEnroll = { label -> enrolling = label; enrollProgress = 0; statusMsg = "正在录入「$label」——请对着桌面持续说话…" },
-                onClearAll = { clf.clearAll(); prediction = null; uiTick++; statusMsg = "已清空当前模型" }
+                onEnroll = { label -> enrolling = label; enrollProgress = 0; statusMsg = "Enrolling \"$label\" — keep speaking toward the desk…" },
+                onClearAll = { clf.clearAll(); prediction = null; uiTick++; statusMsg = "Current model cleared" }
             )
 
             // ===== M4 加速度耦合 & 重建 =====
@@ -188,11 +188,11 @@ fun App(recorder: SensorRecorder, genderClf: Classifier, speakerClf: Classifier)
                         kind = SensorRecorder.Kind.ACCEL
                         delay(500)
                         recorder.startCapture()
-                        m4Status = "外放探测音并采集 5 秒…（手机放桌面别挡扬声器）"
+                        m4Status = "Playing probe tone & capturing 5s… (phone on desk, don't block the speaker)"
                         withContext(Dispatchers.Default) { AudioLab.playProbe(context, 5000) }
                         val a = recorder.stopCapture()
                         lastAccel = a
-                        m4Status = "采集完成：${a.size} 点 @ ${"%.0f".format(recorder.measuredHz)}Hz。可点「重建」"
+                        m4Status = "Captured ${a.size} pts @ ${"%.0f".format(recorder.measuredHz)}Hz. Tap \"Reconstruct\""
                         m4Busy = false
                     }
                 },
@@ -202,23 +202,23 @@ fun App(recorder: SensorRecorder, genderClf: Classifier, speakerClf: Classifier)
                         kind = SensorRecorder.Kind.ACCEL
                         delay(500)
                         recorder.startCapture()
-                        for (s in 5 downTo 1) { m4Status = "采集中…请让手机外放音频（通话/媒体） 还剩 ${s}s"; delay(1000) }
+                        for (s in 5 downTo 1) { m4Status = "Capturing… play audio out loud (call/media). ${s}s left"; delay(1000) }
                         val a = recorder.stopCapture()
                         lastAccel = a
-                        m4Status = "采集完成：${a.size} 点 @ ${"%.0f".format(recorder.measuredHz)}Hz。可点「重建」"
+                        m4Status = "Captured ${a.size} pts @ ${"%.0f".format(recorder.measuredHz)}Hz. Tap \"Reconstruct\""
                         m4Busy = false
                     }
                 },
                 onReconstruct = {
                     val a = lastAccel
-                    if (a == null || a.size < 32) { m4Status = "请先采集"; }
+                    if (a == null || a.size < 32) { m4Status = "Capture first"; }
                     else scope.launch {
-                        m4Busy = true; m4Status = "重建为可听 WAV…"
+                        m4Busy = true; m4Status = "Reconstructing to audible WAV…"
                         val dir = context.getExternalFilesDir(null) ?: context.filesDir
                         val f = File(dir, "recon_${System.currentTimeMillis()}.wav")
                         val dur = withContext(Dispatchers.Default) { AudioLab.reconstructToWav(a, recorder.measuredHz, f) }
                         lastWav = f
-                        m4Status = "已生成 ${f.name}（${"%.1f".format(dur)}s）→ 点「播放重建」"
+                        m4Status = "Saved ${f.name} (${"%.1f".format(dur)}s) → tap \"Play\""
                         m4Busy = false
                     }
                 },
@@ -228,22 +228,23 @@ fun App(recorder: SensorRecorder, genderClf: Classifier, speakerClf: Classifier)
             // 录制 CSV
             Button(
                 onClick = {
-                    if (!recording) { val f = recorder.startRecording(); recording = true; statusMsg = "录制中 → ${f.name}" }
-                    else { recorder.stopRecording(); recording = false; statusMsg = "已保存：${recorder.lastFile?.absolutePath ?: "-"}" }
+                    if (!recording) { val f = recorder.startRecording(); recording = true; statusMsg = "Recording → ${f.name}" }
+                    else { recorder.stopRecording(); recording = false; statusMsg = "Saved: ${recorder.lastFile?.absolutePath ?: "-"}" }
                 },
                 colors = ButtonDefaults.buttonColors(
                     containerColor = if (recording) Color(0xFFE0596B) else panel,
                     contentColor = if (recording) Color.White else textDim
                 ),
                 shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()
-            ) { Text(if (recording) "■ 停止并保存 CSV" else "● 录制原始数据到 CSV") }
+            ) { Text(if (recording) "■ Stop & save CSV" else "● Record raw data to CSV") }
 
             if (statusMsg.isNotEmpty())
                 Text(statusMsg, color = textDim, fontSize = 12.sp, fontFamily = FontFamily.Monospace, lineHeight = 16.sp)
 
             Text(
-                "用法：每类先「录入」几秒（该类的人对着桌面持续说话），≥2 类后即可实时判别。"
-                    + "陀螺仪只保留 <${(hz / 2).toInt()}Hz 分量，性别/说话人可分，但无法逐字转写。",
+                "How to use: Enroll each class for a few seconds (that person keeps speaking toward the desk); "
+                    + "with ≥2 classes it classifies live. The gyroscope only keeps content <${(hz / 2).toInt()}Hz — "
+                    + "gender/speaker are separable, but verbatim transcription is not possible.",
                 color = textDim, fontSize = 11.sp, lineHeight = 16.sp
             )
             Spacer(Modifier.height(8.dp))
@@ -270,7 +271,7 @@ private fun ClassifierCard(
         Modifier.fillMaxWidth().background(panel, RoundedCornerShape(12.dp)).padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        Text("端上分类（最近质心 · 本机训练）", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+        Text("On-device classification (nearest-centroid · trained locally)", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
 
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Mode.values().forEach { m ->
@@ -280,7 +281,7 @@ private fun ClassifierCard(
 
         val voiced = energy > voiceGate
         Text(
-            "信号能量 ${"%.4f".format(energy)} ${if (voiced) "· 有声 ●" else "· 静音（说话才会录入/判别）"}",
+            "Signal energy ${"%.4f".format(energy)} ${if (voiced) "· voiced ●" else "· silent (enroll/classify only while speaking)"}",
             color = if (voiced) accent else textDim, fontSize = 11.sp, fontFamily = FontFamily.Monospace
         )
 
@@ -290,7 +291,7 @@ private fun ClassifierCard(
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Column(Modifier.weight(1f)) {
                         Text(label, color = Color.White, fontSize = 13.sp)
-                        Text("样本 ${clf.sampleCount(label)} 条", color = textDim, fontSize = 11.sp)
+                        Text("${clf.sampleCount(label)} samples", color = textDim, fontSize = 11.sp)
                     }
                     val isThis = enrolling == label
                     Button(
@@ -304,28 +305,28 @@ private fun ClassifierCard(
                         ),
                         shape = RoundedCornerShape(9.dp)
                     ) {
-                        Text(if (isThis) "录入中 ${enrollProgress * 100 / enrollTarget}%" else "录入", fontSize = 12.sp)
+                        Text(if (isThis) "Enrolling ${enrollProgress * 100 / enrollTarget}%" else "Enroll", fontSize = 12.sp)
                     }
                 }
             }
         }
 
-        // 预测结果
+        // Prediction
         Divider(color = Color(0xFF262838))
         if (prediction == null) {
             Text(
-                if (clf.readyClasses() < 2) "至少录入 2 个类别后开始判别" else "说话以显示判别结果…",
+                if (clf.readyClasses() < 2) "Enroll at least 2 classes to start" else "Speak to see the prediction…",
                 color = textDim, fontSize = 12.sp
             )
         } else {
             Text(
-                "判别：${prediction.best}   置信度 ${"%.0f".format(prediction.confidence * 100)}%",
+                "Prediction: ${prediction.best}   confidence ${"%.0f".format(prediction.confidence * 100)}%",
                 color = accent, fontSize = 15.sp, fontWeight = FontWeight.Bold
             )
             prediction.probs.forEach { (label, p) -> ProbBar(label, p) }
         }
 
-        TextButton(onClick = onClearAll) { Text("清空当前模型", color = Color(0xFFE0596B), fontSize = 12.sp) }
+        TextButton(onClick = onClearAll) { Text("Clear current model", color = Color(0xFFE0596B), fontSize = 12.sp) }
     }
 }
 
@@ -373,9 +374,9 @@ private fun M4Card(
         Modifier.fillMaxWidth().background(panel, RoundedCornerShape(12.dp)).padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        Text("M4 · 同机外放耦合 → 可听重建（加速度计）", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+        Text("M4 · Same-phone loudspeaker coupling → audible reconstruction (accelerometer)", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
         Text(
-            "扬声器振动经机身耦合进加速度计。重建为韵律/音高级别的可听音频（DSP 基线，非逐字转写）。",
+            "Speaker vibration couples into the accelerometer through the chassis. Reconstructs audio at prosody/pitch level (DSP baseline, not verbatim transcription).",
             color = textDim, fontSize = 11.sp, lineHeight = 16.sp
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -384,13 +385,13 @@ private fun M4Card(
                 colors = ButtonDefaults.buttonColors(containerColor = accent2, contentColor = bg,
                     disabledContainerColor = Color(0xFF2A2C38), disabledContentColor = textDim),
                 shape = RoundedCornerShape(9.dp), modifier = Modifier.weight(1f)
-            ) { Text("▶ 探测音+采集5s", fontSize = 12.sp) }
+            ) { Text("▶ Probe + capture 5s", fontSize = 12.sp) }
             Button(
                 onClick = onCaptureOnly, enabled = !busy,
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1E2029), contentColor = textDim,
                     disabledContainerColor = Color(0xFF1A1C24), disabledContentColor = Color(0xFF55596B)),
                 shape = RoundedCornerShape(9.dp), modifier = Modifier.weight(1f)
-            ) { Text("● 仅采集5s", fontSize = 12.sp) }
+            ) { Text("● Capture only 5s", fontSize = 12.sp) }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(
@@ -398,15 +399,15 @@ private fun M4Card(
                 colors = ButtonDefaults.buttonColors(containerColor = accent, contentColor = bg,
                     disabledContainerColor = Color(0xFF2A2C38), disabledContentColor = textDim),
                 shape = RoundedCornerShape(9.dp), modifier = Modifier.weight(1f)
-            ) { Text("🔊 重建 WAV", fontSize = 12.sp) }
+            ) { Text("🔊 Reconstruct WAV", fontSize = 12.sp) }
             Button(
                 onClick = onPlayWav, enabled = !busy && hasWav,
                 colors = ButtonDefaults.buttonColors(containerColor = warn, contentColor = bg,
                     disabledContainerColor = Color(0xFF2A2C38), disabledContentColor = textDim),
                 shape = RoundedCornerShape(9.dp), modifier = Modifier.weight(1f)
-            ) { Text("▶ 播放重建", fontSize = 12.sp) }
+            ) { Text("▶ Play", fontSize = 12.sp) }
         }
-        if (accelCount > 0) Text("已采集 $accelCount 点", color = textDim, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+        if (accelCount > 0) Text("Captured $accelCount pts", color = textDim, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
         if (status.isNotEmpty()) Text(status, color = if (busy) warn else accent, fontSize = 12.sp, lineHeight = 16.sp)
     }
 }
@@ -415,7 +416,7 @@ private fun M4Card(
 private fun DisclaimerBanner() {
     Box(Modifier.fillMaxWidth().background(Color(0xFF2A1E12), RoundedCornerShape(10.dp)).padding(12.dp)) {
         Text(
-            "⚠ 研究/教育用途。仅可用于本人设备或经明确同意的实验。未经同意采集他人语音可能违法。",
+            "⚠ Research/education use only. Use on your own device or with explicit consent. Capturing others' speech without consent may be illegal.",
             color = warn, fontSize = 12.sp, lineHeight = 17.sp
         )
     }
@@ -427,10 +428,10 @@ private fun MetricRow(hz: Float, count: Long, pitchHz: Float) {
         Modifier.fillMaxWidth().background(panel, RoundedCornerShape(12.dp)).padding(vertical = 14.dp),
         horizontalArrangement = Arrangement.SpaceEvenly
     ) {
-        Metric("真实采样率", "%.1f Hz".format(hz), accent)
-        Metric("奈奎斯特", "%.0f Hz".format(hz / 2), accent2)
-        Metric("主频≈基频", "%.0f Hz".format(pitchHz), warn)
-        Metric("样本", "$count", Color.White)
+        Metric("Sample rate", "%.1f Hz".format(hz), accent)
+        Metric("Nyquist", "%.0f Hz".format(hz / 2), accent2)
+        Metric("Pitch≈F0", "%.0f Hz".format(pitchHz), warn)
+        Metric("Samples", "$count", Color.White)
     }
 }
 
