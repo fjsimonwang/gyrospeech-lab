@@ -1,0 +1,15 @@
+*.iml
+.gradle/
+/build/
+/app/build/
+/local.properties
+.idea/
+.DS_Store
+/captures
+
+# local session settings
+.claude/settings.local.json
+
+# python cache
+__pycache__/
+*.pyc

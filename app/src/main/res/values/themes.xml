@@ -1,0 +1,5 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <style name="Theme.GyroSpeech" parent="android:Theme.Material.NoActionBar">
+        <item name="android:statusBarColor">#0B0B12</item>
+    </style>
+</resources>
